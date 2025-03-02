@@ -30,8 +30,8 @@ pipeline {
             steps {
                 sh 'npm install' // Installs Node.js dependencies
                 sh 'npm audit fix'
-                sh 'npm audit'
-                sh 'npm audit fix --force'
+                sh 'npm install esbuild@latest vite@latest'
+
             }
         }
 

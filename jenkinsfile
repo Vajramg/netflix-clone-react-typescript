@@ -29,6 +29,8 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh 'npm install' // Installs Node.js dependencies
+                sh 'npm audit fix'
+                sh 'npm audit'
             }
         }
 

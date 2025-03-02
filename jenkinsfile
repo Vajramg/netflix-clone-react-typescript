@@ -1,0 +1,83 @@
+pipeline {
+    agent any
+
+    tools {
+        jdk 'jdk17' // JDK 17 for Java builds
+        nodejs 'nodejs' // Node.js for npm commands
+    }
+
+    environment {
+        scanner_home = tool 'sonar-scanner' // SonarQube scanner tool
+    }
+
+    stages {
+        // Stage 1: Clean Workspace
+        stage('Clean Workspace') {
+            steps {
+                cleanWs() // Cleans the workspace
+            }
+        }
+
+        // Stage 2: Checkout Code from Git
+        stage('Checkout from Git') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Vajramg/netflix-clone-react-typescript.git'
+            }
+        }
+
+        // Stage 3: Install Dependencies
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm install' // Installs Node.js dependencies
+            }
+        }
+
+        // Stage 4: SonarQube Analysis
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('sonar') { // Configures SonarQube environment
+                    sh """
+                        ${scanner_home}/bin/sonar-scanner \
+                        -Dsonar.projectName=Netflix \
+                        -Dsonar.projectKey=Netflix
+                    """
+                }
+            }
+        }
+
+        // Stage 5: Quality Gate Check
+        stage('Quality Gate') {
+            steps {
+                script {
+                    // Waits for SonarQube Quality Gate result
+                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
+                }
+            }
+        }
+
+        // Stage 6: Run Trivy Scans (Optional)
+        stage('Run Trivy Scans') {
+            steps {
+                sh 'trivy fs . > trivyfs.txt' // Filesystem scan
+                sh 'trivy image <your-docker-image> > trivyimage.txt' // Docker image scan
+            }
+        }
+    }
+
+    // Post-build actions
+    post {
+        always {
+            emailext (
+                attachLog: true, // Attach build log
+                subject: "'${currentBuild.result}' - Build Notification", // Email subject
+                body: """
+                    Project: ${env.JOB_NAME}<br/>
+                    Build Number: ${env.BUILD_NUMBER}<br/>
+                    Build URL: ${env.BUILD_URL}<br/>
+                """, // Email body
+                to: 'vajramg@gmail.com', // Recipient email
+                attachmentsPattern: 'trivyfs.txt,trivyimage.txt' // Attach Trivy reports
+            )
+        }
+    }
+}

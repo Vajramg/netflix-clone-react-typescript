@@ -26,12 +26,26 @@ pipeline {
         }
 
         // Stage 3: Install Dependencies
-        stage('Install Dependencies') {
+       stage('Install Dependencies') {
             steps {
-                sh 'npm install' // Installs Node.js dependencies
-                sh 'npm audit fix'
-                sh 'npm install esbuild@latest vite@latest'
+                script {
+                    // Install dependencies
+                    sh 'npm install'
 
+                    // Fix vulnerabilities (if any)
+                    try {
+                        sh 'npm audit fix'
+                    } catch (err) {
+                        echo "WARNING: npm audit fix failed. Attempting to force fix..."
+                        sh 'npm audit fix --force'
+                    }
+
+                    // Update specific packages (esbuild and vite)
+                    sh 'npm install esbuild@latest vite@latest'
+
+                    // Verify installation
+                    sh 'npm list esbuild vite' // Check installed versions of esbuild and vite
+                }
             }
         }
 

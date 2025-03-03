@@ -2,99 +2,61 @@ pipeline {
     agent any
 
     tools {
-        jdk 'jdk17' // JDK 17 for Java builds
-        nodejs 'nodejs' // Node.js for npm commands
+        jdk 'jdk17'
+        nodejs 'node22.14.0'
     }
 
     environment {
-        scanner_home = tool 'sonar-qube' // SonarQube scanner tool
+        SCANNER_HOME = tool 'sonar-qube'
     }
 
     stages {
-        // Stage 1: Clean Workspace
         stage('Clean Workspace') {
             steps {
-                cleanWs() // Cleans the workspace
+                cleanWs()
             }
         }
 
-        // Stage 2: Checkout Code from Git
         stage('Checkout from Git') {
             steps {
                 git branch: 'main', url: 'https://github.com/Vajramg/netflix-clone-react-typescript.git'
             }
         }
 
-        // Stage 3: Install Dependencies
-       stage('Install Dependencies') {
+        stage('Sonarqube Analysis') {
             steps {
-                script {
-                    // Install dependencies
-                    sh 'npm install'
-
-                    // Fix vulnerabilities (if any)
-                    try {
-                        sh 'npm audit fix'
-                    } catch (err) {
-                        echo "WARNING: npm audit fix failed. Attempting to force fix..."
-                        sh 'npm audit fix --force'
-                    }
-
-                    // Update specific packages (esbuild and vite)
-                    sh 'npm install esbuild@latest vite@latest'
-
-                    // Verify installation
-                    sh 'npm list esbuild vite' // Check installed versions of esbuild and vite
-                }
-            }
-        }
-
-        // Stage 4: SonarQube Analysis
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonar') { // Configures SonarQube environment
-                    sh """
-                        ${scanner_home}/bin/sonar-scanner \
+                withSonarQubeEnv('sonar') {
+                    sh """${SCANNER_HOME}/bin/sonar-scanner \
                         -Dsonar.projectName=Netflix \
-                        -Dsonar.projectKey=Netflix
-                    """
+                        -Dsonar.projectKey=Netflix"""
                 }
             }
         }
 
-        // Stage 5: Quality Gate Check
         stage('Quality Gate') {
             steps {
                 script {
-                    // Waits for SonarQube Quality Gate result
                     waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
                 }
             }
         }
 
-        // Stage 6: Run Trivy Scans (Optional)
-        stage('Run Trivy Scans') {
+        stage('Install Dependencies') {
             steps {
-                sh 'trivy fs . > trivyfs.txt' // Filesystem scan
-                sh 'trivy image <your-docker-image> > trivyimage.txt' // Docker image scan
+                sh 'npm install'
             }
         }
     }
 
-    // Post-build actions
     post {
         always {
-            emailext (
-                attachLog: true, // Attach build log
-                subject: "'${currentBuild.result}' - Build Notification", // Email subject
-                body: """
-                    Project: ${env.JOB_NAME}<br/>
-                    Build Number: ${env.BUILD_NUMBER}<br/>
-                    Build URL: ${env.BUILD_URL}<br/>
-                """, // Email body
-                to: 'vajramg@gmail.com', // Recipient email
-                attachmentsPattern: 'trivyfs.txt,trivyimage.txt' // Attach Trivy reports
-            )
+            emailext attachLog: true,
+                subject: "'${currentBuild.result}'",
+                body: "Project: ${env.JOB_NAME}<br/>" +
+                    "Build Number: ${env.BUILD_NUMBER}<br/>" +
+                    "URL: ${env.BUILD_URL}<br/>",
+                to: 'vajramg@gmail.com',
+                attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
         }
     }
 }

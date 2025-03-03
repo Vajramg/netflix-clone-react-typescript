@@ -34,14 +34,16 @@ pipeline {
         }
 
         stage('Quality Gate') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
-                }
+    steps {
+        script {
+            timeout(time: 3, unit: 'MINUTES') {
+                waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
             }
         }
+    }
+}
 
-        stage('Install Dependencies') {
+    stage('Install Dependencies') {
             steps {
                 sh 'npm install'
             }

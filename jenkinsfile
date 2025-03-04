@@ -92,5 +92,7 @@ stage('TRIVY FS SCAN') {
                 currentBuild.result = 'UNSTABLE'
             }
         }
+
+    }
     }
 }

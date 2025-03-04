@@ -69,7 +69,7 @@ stage('OWASP FS SCAN') {
     steps {
         script {
             try {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'dp-check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
             } catch (Exception e) {
                 echo "OWASP Dependency Check failed: ${e.message}"

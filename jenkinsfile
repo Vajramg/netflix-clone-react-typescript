@@ -34,18 +34,48 @@ pipeline {
         }
 
         stage('Quality Gate') {
-    steps {
-        script {
-            timeout(time: 3, unit: 'MINUTES') {
-                waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
+            steps {
+                script {
+                    timeout(time: 3, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: false, credentialsId: 'sonar'
+                    }
+                }
             }
         }
-    }
-}
 
-    stage('Install Dependencies') {
+        stage('Install Dependencies') {
             steps {
                 sh 'npm install'
+            }
+        }
+
+        stage('OWASP FS SCAN') {
+            steps {
+                script {
+                    try {
+                        dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'dp-check'
+                        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                    } catch (Exception e) {
+                        echo "OWASP Dependency Check failed: ${e.message}"
+                        currentBuild.result = 'UNSTABLE' // Mark build as unstable instead of failing
+                    }
+                }
+            }
+        }
+
+        stage('TRIVY FS SCAN') {
+            steps {
+                script {
+                    try {
+                        sh "trivy fs . > trivyfs.txt"
+                        if (!fileExists('trivyfs.txt')) {
+                            error "Trivy FS scan report missing!"
+                        }
+                    } catch (Exception e) {
+                        echo "Trivy FS Scan failed: ${e.message}"
+                        currentBuild.result = 'UNSTABLE'
+                    }
+                }
             }
         }
     }
@@ -53,46 +83,14 @@ pipeline {
     post {
         always {
             emailext (
-    subject: "Build ${currentBuild.result}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-    body: """<p>Project: ${env.JOB_NAME}</p>
-             <p>Build Number: ${env.BUILD_NUMBER}</p>
-             <p>URL: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
-    to: "vajramg@gmail.com",
-    attachLog: true,
-    attachmentsPattern: "trivyfs.txt,trivyimage.txt"
-)
-
+                subject: "Build ${currentBuild.result}: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """<p>Project: ${env.JOB_NAME}</p>
+                         <p>Build Number: ${env.BUILD_NUMBER}</p>
+                         <p>URL: <a href='${env.BUILD_URL}'>${env.BUILD_URL}</a></p>""",
+                to: "vajramg@gmail.com",
+                attachLog: true,
+                attachmentsPattern: "trivyfs.txt,dependency-check-report.xml"
+            )
         }
-    }
-
-stage('OWASP FS SCAN') {
-    steps {
-        script {
-            try {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'dp-check'
-                dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-            } catch (Exception e) {
-                echo "OWASP Dependency Check failed: ${e.message}"
-                currentBuild.result = 'UNSTABLE' // Mark build as unstable instead of failing
-            }
-        }
-    }
-}
-
-stage('TRIVY FS SCAN') {
-    steps {
-        script {
-            try {
-                sh "trivy fs . > trivyfs.txt"
-                if (!fileExists('trivyfs.txt')) {
-                    error "Trivy FS scan report missing!"
-                }
-            } catch (Exception e) {
-                echo "Trivy FS Scan failed: ${e.message}"
-                currentBuild.result = 'UNSTABLE'
-            }
-        }
-
-    }
     }
 }

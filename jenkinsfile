@@ -94,4 +94,3 @@ stage('TRIVY FS SCAN') {
         }
     }
 }
-

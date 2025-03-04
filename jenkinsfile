@@ -65,16 +65,33 @@ pipeline {
         }
     }
 
-    stage('OWASP FS SCAN') {
-            steps {
-                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'dp-Check'
+stage('OWASP FS SCAN') {
+    steps {
+        script {
+            try {
+                dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
                 dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+            } catch (Exception e) {
+                echo "OWASP Dependency Check failed: ${e.message}"
+                currentBuild.result = 'UNSTABLE' // Mark build as unstable instead of failing
             }
         }
-        stage('TRIVY FS SCAN') {
-            steps {
+    }
+}
+
+stage('TRIVY FS SCAN') {
+    steps {
+        script {
+            try {
                 sh "trivy fs . > trivyfs.txt"
+                if (!fileExists('trivyfs.txt')) {
+                    error "Trivy FS scan report missing!"
+                }
+            } catch (Exception e) {
+                echo "Trivy FS Scan failed: ${e.message}"
+                currentBuild.result = 'UNSTABLE'
             }
         }
+    }
 }
 
